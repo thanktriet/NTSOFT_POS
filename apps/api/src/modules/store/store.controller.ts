@@ -1,0 +1,38 @@
+import { Controller, Get, Post, Put, Param, Body, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import { StoreService } from './store.service';
+
+@ApiTags('Store')
+@Controller('stores')
+export class StoreController {
+  constructor(private storeService: StoreService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Get all stores' })
+  findAll() {
+    return this.storeService.findAll();
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Get store by ID' })
+  findById(@Param('id') id: string) {
+    return this.storeService.findById(id);
+  }
+
+  @Post()
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Create store' })
+  create(@Body() data: { name: string; address?: string; phone?: string }) {
+    return this.storeService.create(data);
+  }
+
+  @Put(':id')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update store' })
+  update(@Param('id') id: string, @Body() data: { name?: string; address?: string; phone?: string }) {
+    return this.storeService.update(id, data);
+  }
+}

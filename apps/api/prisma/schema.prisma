@@ -1,0 +1,267 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ STORE ============
+
+model Store {
+  id        String   @id @default(cuid())
+  name      String
+  address   String?
+  phone     String?
+  logo      String?
+  settings  Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  staff          Staff[]
+  tables         Table[]
+  menuCategories MenuCategory[]
+  orders         Order[]
+  notifications  Notification[]
+  shifts         Shift[]
+}
+
+// ============ STAFF ============
+
+enum StaffRole {
+  owner
+  manager
+  staff
+  kitchen
+}
+
+model Staff {
+  id        String    @id @default(cuid())
+  storeId   String
+  name      String
+  pin       String    // hashed 4-6 digit PIN
+  phone     String?
+  email     String?   @unique
+  role      StaffRole @default(staff)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  store         Store       @relation(fields: [storeId], references: [id])
+  orders        Order[]     @relation("OrderCreatedBy")
+  assignedItems OrderItem[] @relation("AssignedChef")
+  shifts        Shift[]
+
+  @@unique([storeId, pin])
+  @@index([storeId])
+}
+
+// ============ TABLE ============
+
+enum TableStatus {
+  empty
+  occupied
+  reserved
+  paying
+}
+
+model Table {
+  id        String      @id @default(cuid())
+  storeId   String
+  name      String      // e.g. "A01", "B03"
+  floor     String      @default("1") // tầng
+  seats     Int         @default(4)
+  status    TableStatus @default(empty)
+  qrCode    String?     @unique // unique URL for QR ordering
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  store  Store   @relation(fields: [storeId], references: [id])
+  orders Order[]
+
+  @@unique([storeId, name])
+  @@index([storeId])
+}
+
+// ============ MENU ============
+
+model MenuCategory {
+  id        String   @id @default(cuid())
+  storeId   String
+  name      String
+  icon      String?  // emoji or icon name
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  store Store      @relation(fields: [storeId], references: [id])
+  items MenuItem[]
+
+  @@index([storeId])
+}
+
+model MenuItem {
+  id          String   @id @default(cuid())
+  categoryId  String
+  name        String
+  price       Int      // stored in VND (no decimals needed)
+  image       String?
+  description String?
+  prepTime    Int?     // estimated minutes
+  isAvailable Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category   MenuCategory @relation(fields: [categoryId], references: [id])
+  options    MenuOption[]
+  orderItems OrderItem[]
+
+  @@index([categoryId])
+}
+
+model MenuOption {
+  id         String  @id @default(cuid())
+  menuItemId String
+  groupName  String  // e.g. "Size", "Topping"
+  name       String  // e.g. "Size lớn", "Thêm phô mai"
+  price      Int     @default(0) // additional price
+  isRequired Boolean @default(false)
+  sortOrder  Int     @default(0)
+
+  menuItem MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+
+  @@index([menuItemId])
+}
+
+// ============ ORDER ============
+
+enum OrderStatus {
+  pending
+  confirmed
+  cooking
+  served
+  paid
+  cancelled
+}
+
+enum OrderSource {
+  qr
+  staff
+}
+
+enum PaymentMethod {
+  cash
+  qr_transfer
+  momo
+  card
+  mixed
+}
+
+model Order {
+  id            String         @id @default(cuid())
+  storeId       String
+  tableId       String
+  staffId       String?        // null if QR order
+  orderNumber   Int            // auto-increment per store per day
+  status        OrderStatus    @default(pending)
+  source        OrderSource    @default(staff)
+  subtotal      Int            @default(0)
+  discount      Int            @default(0)
+  total         Int            @default(0)
+  note          String?
+  paymentMethod PaymentMethod?
+  paidAt        DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  store Store  @relation(fields: [storeId], references: [id])
+  table Table  @relation(fields: [tableId], references: [id])
+  staff Staff? @relation("OrderCreatedBy", fields: [staffId], references: [id])
+  items OrderItem[]
+
+  @@index([storeId, createdAt])
+  @@index([tableId])
+  @@index([status])
+}
+
+// ============ ORDER ITEM (FIFO per dish) ============
+
+enum OrderItemStatus {
+  pending
+  cooking
+  ready
+  served
+}
+
+model OrderItem {
+  id           String          @id @default(cuid())
+  orderId      String
+  menuItemId   String
+  quantity     Int             @default(1)
+  unitPrice    Int             // price at time of order
+  note         String?         // special instructions
+  options      Json            @default("[]") // selected options snapshot
+  status       OrderItemStatus @default(pending)
+  assignedToId String?         // chef who's cooking
+  startedAt    DateTime?       // when cooking started
+  completedAt  DateTime?       // when marked ready
+  servedAt     DateTime?       // when served to customer
+  createdAt    DateTime        @default(now())
+
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id])
+  assignedTo Staff?   @relation("AssignedChef", fields: [assignedToId], references: [id])
+
+  @@index([orderId])
+  @@index([status, createdAt]) // FIFO query
+}
+
+// ============ NOTIFICATION ============
+
+enum NotificationType {
+  order_new
+  order_ready
+  payment_request
+  service_request
+  system
+}
+
+model Notification {
+  id         String           @id @default(cuid())
+  storeId    String
+  type       NotificationType
+  title      String
+  body       String?
+  data       Json             @default("{}")
+  targetRole StaffRole?       // null = all
+  isRead     Boolean          @default(false)
+  createdAt  DateTime         @default(now())
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@index([storeId, createdAt])
+  @@index([storeId, isRead])
+}
+
+// ============ SHIFT ============
+
+model Shift {
+  id        String    @id @default(cuid())
+  storeId   String
+  staffId   String
+  startAt   DateTime  @default(now())
+  endAt     DateTime?
+  revenue   Int       @default(0)
+  orders    Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  store Store @relation(fields: [storeId], references: [id])
+  staff Staff @relation(fields: [staffId], references: [id])
+
+  @@index([storeId, startAt])
+  @@index([staffId])
+}
