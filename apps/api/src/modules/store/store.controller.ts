@@ -35,4 +35,20 @@ export class StoreController {
   update(@Param('id') id: string, @Body() data: { name?: string; address?: string; phone?: string }) {
     return this.storeService.update(id, data);
   }
+
+  @Get(':id/settings')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get store settings' })
+  getSettings(@Param('id') id: string) {
+    return this.storeService.getSettings(id);
+  }
+
+  @Put(':id/settings')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update store settings (merge)' })
+  updateSettings(@Param('id') id: string, @Body() settings: Record<string, any>) {
+    return this.storeService.updateSettings(id, settings);
+  }
 }

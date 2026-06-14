@@ -28,8 +28,8 @@ export class PaymentController {
 
   @Get('qr')
   @ApiOperation({ summary: 'Generate QR payment info' })
-  generateQr(@Query('amount') amount: number, @Query('table') table: string) {
-    return this.paymentService.generateQrPayment(amount, table);
+  generateQr(@Query('amount') amount: number, @Query('table') table: string, @Query('storeId') storeId?: string) {
+    return this.paymentService.generateQrPayment(amount, table, storeId);
   }
 
   @Get('revenue/:storeId')

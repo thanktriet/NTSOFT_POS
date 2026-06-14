@@ -86,15 +86,36 @@ export class PaymentService {
   }
 
   // Generate VietQR payment info
-  generateQrPayment(amount: number, tableLabel: string) {
-    // VietQR standard format
+  async generateQrPayment(amount: number, tableLabel: string, storeId?: string) {
+    // Get config from store settings
+    let bankCode = 'VCB';
+    let accountNumber = '1234567890';
+    let accountName = 'NTSOFT POS';
+    let template = 'compact';
+
+    if (storeId) {
+      const store = await this.prisma.store.findUnique({ where: { id: storeId } });
+      if (store?.settings && typeof store.settings === 'object') {
+        const settings = store.settings as any;
+        if (settings.vietqr) {
+          bankCode = settings.vietqr.bankCode || bankCode;
+          accountNumber = settings.vietqr.accountNumber || accountNumber;
+          accountName = settings.vietqr.accountName || accountName;
+          template = settings.vietqr.template || template;
+        }
+      }
+    }
+
+    const content = `${tableLabel} ${amount}`.replace(/\./g, '');
+    const qrUrl = `https://img.vietqr.io/image/${bankCode}-${accountNumber}-${template}.png?amount=${amount}&addInfo=${encodeURIComponent(content)}&accountName=${encodeURIComponent(accountName)}`;
+
     return {
-      bank: 'Vietcombank',
-      accountNumber: '1234567890', // configured per store
-      accountName: 'Nam Thắng F&B',
+      bankCode,
+      accountNumber,
+      accountName,
       amount,
-      content: `${tableLabel} ${amount}`.replace(/\./g, ''),
-      qrUrl: `https://img.vietqr.io/image/VCB-1234567890-compact.png?amount=${amount}&addInfo=${tableLabel}`,
+      content,
+      qrUrl,
     };
   }
 
