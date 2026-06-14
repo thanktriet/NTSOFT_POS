@@ -94,7 +94,7 @@ export default function StaffDashboardPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-4 gap-2 px-4 pb-4">
+      <div className="grid grid-cols-4 gap-2 px-4 pb-2">
         <Link href="/staff/tables" className="bg-dark-600 border border-dark-400 rounded-xl p-3 text-center">
           <div className="text-xl mb-1">🪑</div>
           <span className="text-[10px] text-gray-400">Quản lý bàn</span>
@@ -103,9 +103,9 @@ export default function StaffDashboardPage() {
           <div className="text-xl mb-1">📝</div>
           <span className="text-[10px] text-gray-400">Order mới</span>
         </Link>
-        <Link href="/staff/notifications" className="bg-dark-600 border border-dark-400 rounded-xl p-3 text-center">
-          <div className="text-xl mb-1">🛎️</div>
-          <span className="text-[10px] text-gray-400">Dịch vụ</span>
+        <Link href="/staff/qr-codes" className="bg-dark-600 border border-dark-400 rounded-xl p-3 text-center">
+          <div className="text-xl mb-1">📱</div>
+          <span className="text-[10px] text-gray-400">QR Code</span>
         </Link>
         <Link href="/staff/payment" className="bg-dark-600 border border-dark-400 rounded-xl p-3 text-center">
           <div className="text-xl mb-1">💳</div>

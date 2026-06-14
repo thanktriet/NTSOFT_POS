@@ -10,6 +10,7 @@ import { KitchenModule } from './modules/kitchen/kitchen.module';
 import { PaymentModule } from './modules/payment/payment.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { PrintModule } from './modules/print/print.module';
+import { QrModule } from './modules/qr/qr.module';
 import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
@@ -25,6 +26,7 @@ import { GatewayModule } from './gateway/gateway.module';
     PaymentModule,
     NotificationModule,
     PrintModule,
+    QrModule,
     GatewayModule,
   ],
 })

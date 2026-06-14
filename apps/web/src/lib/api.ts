@@ -1,4 +1,13 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+function getApiBase(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined') {
+    // Use same hostname as frontend but port 3001
+    return `http://${window.location.hostname}:3001`;
+  }
+  return 'http://localhost:3001';
+}
+
+const API_BASE = typeof window !== 'undefined' ? getApiBase() : 'http://localhost:3001';
 
 type FetchOptions = {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE';

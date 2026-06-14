@@ -3,7 +3,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001/ws';
+function getWsUrl(): string {
+  if (process.env.NEXT_PUBLIC_WS_URL) return process.env.NEXT_PUBLIC_WS_URL;
+  if (typeof window !== 'undefined') {
+    return `http://${window.location.hostname}:3001/ws`;
+  }
+  return 'http://localhost:3001/ws';
+}
+
+const WS_URL = typeof window !== 'undefined' ? getWsUrl() : 'http://localhost:3001/ws';
 
 interface UseSocketOptions {
   storeId: string;
