@@ -77,13 +77,25 @@ export default function StaffAccountPage() {
       <div className="px-4 mt-5">
         <p className="text-[11px] text-gray-600 font-semibold uppercase mb-2">Cài đặt</p>
         <div className="bg-dark-600 rounded-xl border border-dark-400 overflow-hidden">
-          <MenuItem icon="🖨️" title="Máy in" desc="IP LAN / Bluetooth" href="/staff/print-settings" />
-          <MenuItem icon="💳" title="VietQR / Thanh toán" desc="Ngân hàng, số tài khoản" href="/staff/settings/vietqr" />
-          <MenuItem icon="📱" title="QR Code bàn" desc="Xem, in QR cho từng bàn" href="/staff/qr-codes" />
           <MenuItem icon="🔔" title="Thông báo" desc="Âm thanh, rung, hiển thị" href="#" />
           <MenuItem icon="🔒" title="Đổi mã PIN" desc="Cập nhật PIN đăng nhập" href="#" />
         </div>
       </div>
+
+      {/* Menu: Quản lý (chỉ owner/manager) */}
+      {(staff?.role === 'owner' || staff?.role === 'manager') && (
+        <div className="px-4 mt-4">
+          <p className="text-[11px] text-gray-600 font-semibold uppercase mb-2">Quản lý cửa hàng</p>
+          <div className="bg-dark-600 rounded-xl border border-dark-400 overflow-hidden">
+            <MenuItem icon="🖨️" title="Máy in" desc="IP LAN / Bluetooth" href="/staff/print-settings" />
+            <MenuItem icon="💳" title="VietQR / Thanh toán" desc="Ngân hàng, số tài khoản" href="/staff/settings/vietqr" />
+            <MenuItem icon="📱" title="QR Code bàn" desc="Xem, in QR cho từng bàn" href="/staff/qr-codes" />
+            <MenuItem icon="👥" title="Nhân viên" desc="Quản lý tài khoản, phân quyền" href="#" />
+            <MenuItem icon="📋" title="Menu" desc="Thêm/sửa/ẩn món" href="#" />
+            <MenuItem icon="📊" title="Báo cáo" desc="Doanh thu, thống kê" href="/admin" />
+          </div>
+        </div>
+      )}
 
       {/* Menu: Hỗ trợ */}
       <div className="px-4 mt-4">
