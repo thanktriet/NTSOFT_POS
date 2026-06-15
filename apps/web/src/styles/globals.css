@@ -6,7 +6,6 @@
 
 @layer base {
   html {
-    /* Safe area for notch devices */
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
     padding-left: env(safe-area-inset-left);
@@ -15,7 +14,6 @@
 
   body {
     @apply font-sans antialiased;
-    /* Native app feel */
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
@@ -24,13 +22,11 @@
     overflow-x: hidden;
   }
 
-  /* Allow text selection in inputs/textareas */
   input, textarea, [contenteditable] {
     -webkit-user-select: text;
     user-select: text;
   }
 
-  /* Hide scrollbar but keep scroll functionality */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -39,12 +35,28 @@
     display: none;
   }
 
-  /* Smooth scroll */
+  /* GPU-accelerated smooth scroll */
   * {
     scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
   }
 
-  /* PWA standalone mode - hide status bar area on iOS */
+  /* All transitions use GPU acceleration */
+  button, a, [role="button"] {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+                opacity 0.15s ease,
+                background-color 0.2s ease,
+                border-color 0.2s ease;
+  }
+
+  button:active, a:active, [role="button"]:active {
+    transform: scale(0.96);
+  }
+
+  /* PWA standalone */
   @media all and (display-mode: standalone) {
     body {
       padding-top: env(safe-area-inset-top);
@@ -55,18 +67,50 @@
 @layer components {
   .btn-primary {
     @apply bg-primary-500 text-white px-4 py-2 rounded-lg font-semibold
-           hover:bg-primary-600 active:scale-95 transition-all;
+           hover:bg-primary-600 active:scale-95 transition-all duration-150;
   }
   .btn-secondary {
     @apply bg-dark-500 text-gray-300 px-4 py-2 rounded-lg font-semibold
-           hover:bg-dark-400 transition-all;
+           hover:bg-dark-400 transition-all duration-150;
   }
   .card {
     @apply bg-dark-600 border border-dark-400 rounded-xl p-4;
   }
   .input {
     @apply bg-dark-600 border border-dark-400 rounded-lg px-4 py-3 text-white
-           placeholder:text-gray-500 outline-none focus:border-primary-500 transition-colors;
+           placeholder:text-gray-500 outline-none focus:border-primary-500 transition-colors duration-200;
+  }
+
+  /* Page transition wrapper */
+  .page-enter {
+    @apply animate-fadeInUp;
+  }
+
+  /* Skeleton loading */
+  .skeleton {
+    @apply bg-dark-500 rounded-lg relative overflow-hidden;
+    background: linear-gradient(90deg, #252830 25%, #2a2d37 50%, #252830 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+  }
+
+  /* Smooth card press */
+  .press-card {
+    transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.15s ease;
+  }
+  .press-card:active {
+    transform: scale(0.97);
+  }
+
+  /* Bottom sheet backdrop */
+  .backdrop-blur-sheet {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  /* Smooth number counter */
+  .num-transition {
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   /* Pull-to-refresh prevention */
@@ -77,5 +121,49 @@
   /* Fixed bottom bar with safe area */
   .bottom-safe {
     padding-bottom: calc(0.75rem + env(safe-area-inset-bottom));
+  }
+
+  /* Staggered children animation */
+  .stagger-children > * {
+    opacity: 0;
+    animation: fadeInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+  .stagger-children > *:nth-child(1) { animation-delay: 0.03s; }
+  .stagger-children > *:nth-child(2) { animation-delay: 0.06s; }
+  .stagger-children > *:nth-child(3) { animation-delay: 0.09s; }
+  .stagger-children > *:nth-child(4) { animation-delay: 0.12s; }
+  .stagger-children > *:nth-child(5) { animation-delay: 0.15s; }
+  .stagger-children > *:nth-child(6) { animation-delay: 0.18s; }
+  .stagger-children > *:nth-child(7) { animation-delay: 0.21s; }
+  .stagger-children > *:nth-child(8) { animation-delay: 0.24s; }
+  .stagger-children > *:nth-child(9) { animation-delay: 0.27s; }
+  .stagger-children > *:nth-child(10) { animation-delay: 0.30s; }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Haptic press effect for numpad */
+  .numpad-btn {
+    transition: transform 0.1s cubic-bezier(0.16, 1, 0.3, 1),
+                background-color 0.1s ease;
+  }
+  .numpad-btn:active {
+    transform: scale(0.88);
+  }
+
+  /* Toast notification slide */
+  .toast-enter {
+    animation: slideDown 0.3s cubic-bezier(0.16, 1, 0.3, 1), fadeIn 0.2s ease;
+  }
+
+  @keyframes slideDown {
+    from { transform: translateY(-100%); }
+    to { transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
   }
 }
