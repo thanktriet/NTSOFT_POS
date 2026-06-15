@@ -91,7 +91,7 @@ export default function StaffAccountPage() {
             <MenuItem icon="💳" title="VietQR / Thanh toán" desc="Ngân hàng, số tài khoản" href="/staff/settings/vietqr" />
             <MenuItem icon="📱" title="QR Code bàn" desc="Xem, in QR cho từng bàn" href="/staff/qr-codes" />
             <MenuItem icon="👥" title="Nhân viên" desc="Quản lý tài khoản, phân quyền" href="#" />
-            <MenuItem icon="📋" title="Menu" desc="Thêm/sửa/ẩn món" href="#" />
+            <MenuItem icon="📋" title="Menu" desc="Thêm/sửa/ẩn món" href="/staff/menu" />
             <MenuItem icon="📊" title="Báo cáo" desc="Doanh thu, thống kê" href="/admin" />
           </div>
         </div>
