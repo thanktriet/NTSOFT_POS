@@ -111,6 +111,15 @@ export default function AdminDashboardPage() {
           <span className="text-xs text-gray-500">
             {new Date().toLocaleDateString('vi-VN')} · Ca sáng
           </span>
+          <a href="/staff/settings/vietqr" className="bg-dark-500 border border-dark-400 px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-orange-500 hover:border-orange-500 transition-colors">
+            💳 VietQR
+          </a>
+          <a href="/staff/print-settings" className="bg-dark-500 border border-dark-400 px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-orange-500 hover:border-orange-500 transition-colors">
+            🖨️ Máy in
+          </a>
+          <a href="/staff/qr-codes" className="bg-dark-500 border border-dark-400 px-3 py-1.5 rounded-lg text-xs text-gray-400 hover:text-orange-500 hover:border-orange-500 transition-colors">
+            📱 QR Bàn
+          </a>
           <span className={cn(
             'text-[9px] font-bold px-2 py-0.5 rounded-full',
             connected ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-600 text-gray-400',
