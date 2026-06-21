@@ -11,6 +11,8 @@ import { PaymentModule } from './modules/payment/payment.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { PrintModule } from './modules/print/print.module';
 import { QrModule } from './modules/qr/qr.module';
+import { StaffModule } from './modules/staff/staff.module';
+import { ReportModule } from './modules/report/report.module';
 import { GatewayModule } from './gateway/gateway.module';
 
 @Module({
@@ -27,6 +29,8 @@ import { GatewayModule } from './gateway/gateway.module';
     NotificationModule,
     PrintModule,
     QrModule,
+    StaffModule,
+    ReportModule,
     GatewayModule,
   ],
 })

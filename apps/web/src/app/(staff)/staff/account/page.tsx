@@ -78,7 +78,7 @@ export default function StaffAccountPage() {
         <p className="text-[11px] text-gray-600 font-semibold uppercase mb-2">Cài đặt</p>
         <div className="bg-dark-600 rounded-xl border border-dark-400 overflow-hidden">
           <MenuItem icon="🔔" title="Thông báo" desc="Âm thanh, rung, hiển thị" href="#" />
-          <MenuItem icon="🔒" title="Đổi mã PIN" desc="Cập nhật PIN đăng nhập" href="#" />
+          <MenuItem icon="🔒" title="Đổi mã PIN" desc="Cập nhật PIN đăng nhập" href="/staff/change-pin" />
         </div>
       </div>
 
@@ -90,9 +90,9 @@ export default function StaffAccountPage() {
             <MenuItem icon="🖨️" title="Máy in" desc="IP LAN / Bluetooth" href="/staff/print-settings" />
             <MenuItem icon="💳" title="VietQR / Thanh toán" desc="Ngân hàng, số tài khoản" href="/staff/settings/vietqr" />
             <MenuItem icon="📱" title="QR Code bàn" desc="Xem, in QR cho từng bàn" href="/staff/qr-codes" />
-            <MenuItem icon="👥" title="Nhân viên" desc="Quản lý tài khoản, phân quyền" href="#" />
+            <MenuItem icon="👥" title="Nhân viên" desc="Quản lý tài khoản, phân quyền" href="/staff/staff-management" />
             <MenuItem icon="📋" title="Menu" desc="Thêm/sửa/ẩn món" href="/staff/menu" />
-            <MenuItem icon="📊" title="Báo cáo" desc="Doanh thu, thống kê" href="/admin" />
+            <MenuItem icon="📊" title="Báo cáo" desc="Doanh thu, thống kê" href="/staff/reports" />
           </div>
         </div>
       )}
