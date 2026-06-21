@@ -2,17 +2,15 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useCartStore } from '@/stores/cart.store';
 import { createOrder } from '@/lib/api';
 import { formatVND } from '@/lib/utils';
 
-export default function CartPage({
-  params,
-}: {
-  params: { storeId: string; tableId: string };
-}) {
-  const { storeId, tableId } = params;
+export default function CartPage() {
+  const params = useParams();
+  const storeId = params.storeId as string;
+  const tableId = params.tableId as string;
   const router = useRouter();
   const cart = useCartStore();
   const [submitting, setSubmitting] = useState(false);

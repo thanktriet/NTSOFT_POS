@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useParams } from 'next/navigation';
 import { getOrdersByTable } from '@/lib/api';
 import { formatVND, cn } from '@/lib/utils';
 
@@ -29,12 +30,10 @@ const STATUS_CONFIG = {
   served: { label: 'Đã phục vụ', color: 'text-green-500', bg: 'bg-green-50', icon: '🍽️' },
 };
 
-export default function OrderTrackingPage({
-  params,
-}: {
-  params: { storeId: string; tableId: string };
-}) {
-  const { storeId, tableId } = params;
+export default function OrderTrackingPage() {
+  const params = useParams();
+  const storeId = params.storeId as string;
+  const tableId = params.tableId as string;
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 

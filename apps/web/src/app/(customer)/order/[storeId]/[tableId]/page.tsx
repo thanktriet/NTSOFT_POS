@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import { useCartStore } from '@/stores/cart.store';
 import { getMenu } from '@/lib/api';
 import { formatVND, cn } from '@/lib/utils';
@@ -31,12 +32,10 @@ interface MenuCategory {
   items: MenuItem[];
 }
 
-export default function CustomerMenuPage({
-  params,
-}: {
-  params: { storeId: string; tableId: string };
-}) {
-  const { storeId, tableId } = params;
+export default function CustomerMenuPage() {
+  const params = useParams();
+  const storeId = params.storeId as string;
+  const tableId = params.tableId as string;
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('');
   const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
