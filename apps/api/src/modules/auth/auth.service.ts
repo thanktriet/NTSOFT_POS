@@ -47,7 +47,7 @@ export class AuthService {
 
     // Find staff by checking hashed PINs
     const allStaff = await this.prisma.staff.findMany({
-      where: { storeId, isActive: true },
+      where: { storeId, isActive: true, deletedAt: null },
     });
 
     const matchedStaff = await this.findStaffByPin(allStaff, pin);

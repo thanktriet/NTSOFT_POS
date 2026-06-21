@@ -10,16 +10,17 @@ datasource db {
 // ============ STORE ============
 
 model Store {
-  id        String   @id @default(cuid())
-  name      String
-  address   String?
-  phone     String?
-  logo      String?
-  storeKey  String   @unique // sk-key for multi-tenant auth
-  keyExpireDays Int  @default(30) // auto-expire after N days
-  settings  Json     @default("{}")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String    @id @default(cuid())
+  name          String
+  address       String?
+  phone         String?
+  logo          String?
+  storeKey      String    @unique
+  keyExpireDays Int       @default(30)
+  settings      Json      @default("{}")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime? // soft delete
 
   staff          Staff[]
   tables         Table[]
@@ -42,13 +43,14 @@ model Staff {
   id        String    @id @default(cuid())
   storeId   String
   name      String
-  pin       String    // hashed 4-6 digit PIN
+  pin       String
   phone     String?
   email     String?   @unique
   role      StaffRole @default(staff)
   isActive  Boolean   @default(true)
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // soft delete
 
   store         Store       @relation(fields: [storeId], references: [id])
   orders        Order[]     @relation("OrderCreatedBy")

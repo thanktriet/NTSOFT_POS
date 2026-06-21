@@ -9,7 +9,7 @@ export class StaffService {
 
   async findByStore(storeId: string) {
     return this.prisma.staff.findMany({
-      where: { storeId },
+      where: { storeId, deletedAt: null },
       select: {
         id: true,
         name: true,
@@ -111,6 +111,10 @@ export class StaffService {
   }
 
   async delete(id: string) {
-    return this.prisma.staff.delete({ where: { id } });
+    return this.prisma.staff.update({
+      where: { id },
+      data: { deletedAt: new Date(), isActive: false },
+      select: { id: true, name: true },
+    });
   }
 }
