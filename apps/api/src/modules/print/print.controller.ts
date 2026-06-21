@@ -79,4 +79,44 @@ export class PrintController {
     );
     return { success, message: success ? 'Máy in hoạt động tốt' : 'Không thể kết nối' };
   }
+
+  @Post('open-drawer')
+  @ApiOperation({ summary: 'Open cash drawer via printer' })
+  async openDrawer(@Body() config: { ip: string; port?: number; pin?: 1 | 2 }) {
+    const { EscPosBuilder } = await import('./escpos.builder');
+    const builder = new EscPosBuilder();
+    const data = builder.init().openDrawer(config.pin || 1).build();
+
+    const success = await this.printService.printViaIp(
+      data,
+      config.ip,
+      config.port || 9100,
+    );
+    return { success, message: success ? 'Đã mở ngăn kéo' : 'Không thể kết nối máy in' };
+  }
+
+  @Post('receipt-and-drawer/:orderId')
+  @ApiOperation({ summary: 'Print receipt + open drawer (for cash payment)' })
+  async printReceiptAndOpenDrawer(
+    @Param('orderId') orderId: string,
+    @Body() config: { ip: string; port?: number },
+  ) {
+    const { EscPosBuilder } = await import('./escpos.builder');
+
+    // Generate receipt
+    const receiptData = await this.printService.generateReceipt(orderId);
+
+    // Open drawer command
+    const drawerCmd = new EscPosBuilder().openDrawer(1).build();
+
+    // Combine: receipt + cut + open drawer
+    const combined = Buffer.concat([receiptData, drawerCmd]);
+
+    const success = await this.printService.printViaIp(
+      combined,
+      config.ip,
+      config.port || 9100,
+    );
+    return { success, message: success ? 'In bill + mở ngăn kéo thành công' : 'Không thể kết nối' };
+  }
 }

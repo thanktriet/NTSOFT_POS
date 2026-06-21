@@ -39,6 +39,17 @@ export class EscPosBuilder {
     return this;
   }
 
+  // Open cash drawer (RJ11 connected to printer)
+  openDrawer(pin: 1 | 2 = 1): this {
+    // ESC p m t1 t2
+    // m = pin (0 = pin 2, 1 = pin 5)
+    // t1 = pulse ON time (25 * 2ms = 50ms)
+    // t2 = pulse OFF time (250 * 2ms = 500ms)
+    const pinNum = pin === 1 ? 0x00 : 0x01;
+    this.buffer.push(EscPosBuilder.ESC, 0x70, pinNum, 0x19, 0xfa);
+    return this;
+  }
+
   align(alignment: 'left' | 'center' | 'right'): this {
     const values = { left: 0x00, center: 0x01, right: 0x02 };
     this.buffer.push(EscPosBuilder.ESC, 0x61, values[alignment]);
