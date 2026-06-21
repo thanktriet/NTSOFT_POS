@@ -32,8 +32,16 @@ export class StoreController {
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update store' })
-  update(@Param('id') id: string, @Body() data: { name?: string; address?: string; phone?: string }) {
+  update(@Param('id') id: string, @Body() data: { name?: string; address?: string; phone?: string; keyExpireDays?: number }) {
     return this.storeService.update(id, data);
+  }
+
+  @Put(':id/regenerate-key')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Regenerate store key' })
+  regenerateKey(@Param('id') id: string, @Body() data: { newKey: string }) {
+    return this.storeService.regenerateKey(id, data.newKey);
   }
 
   @Get(':id/settings')

@@ -17,8 +17,16 @@ export class StoreService {
     return this.prisma.store.create({ data });
   }
 
-  async update(id: string, data: { name?: string; address?: string; phone?: string }) {
+  async update(id: string, data: { name?: string; address?: string; phone?: string; keyExpireDays?: number }) {
     return this.prisma.store.update({ where: { id }, data });
+  }
+
+  async regenerateKey(id: string, newKey: string) {
+    return this.prisma.store.update({
+      where: { id },
+      data: { storeKey: newKey },
+      select: { id: true, name: true, storeKey: true },
+    });
   }
 
   async updateSettings(id: string, settings: Record<string, any>) {
