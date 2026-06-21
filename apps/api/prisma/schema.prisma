@@ -15,6 +15,8 @@ model Store {
   address   String?
   phone     String?
   logo      String?
+  storeKey  String   @unique // sk-key for multi-tenant auth
+  keyExpireDays Int  @default(30) // auto-expire after N days
   settings  Json     @default("{}")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

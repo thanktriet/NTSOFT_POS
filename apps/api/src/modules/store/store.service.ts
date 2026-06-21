@@ -13,7 +13,7 @@ export class StoreService {
     return this.prisma.store.findMany();
   }
 
-  async create(data: { name: string; address?: string; phone?: string }) {
+  async create(data: { name: string; address?: string; phone?: string; storeKey: string }) {
     return this.prisma.store.create({ data });
   }
 

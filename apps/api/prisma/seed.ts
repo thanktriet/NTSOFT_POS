@@ -9,15 +9,17 @@ async function main() {
   // 1. Create Store
   const store = await prisma.store.upsert({
     where: { id: 'store-001' },
-    update: {},
+    update: { storeKey: 'sk-namthang-001' },
     create: {
       id: 'store-001',
       name: 'Nam Thắng Beer & Food',
       address: '123 Nguyễn Huệ, Q.1, TP.HCM',
       phone: '0901234567',
+      storeKey: 'sk-namthang-001',
+      keyExpireDays: 30,
     },
   });
-  console.log('✓ Store created:', store.name);
+  console.log('✓ Store created:', store.name, '| key:', 'sk-namthang-001');
 
   // 2. Create Staff
   const staffData = [

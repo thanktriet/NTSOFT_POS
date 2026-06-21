@@ -24,7 +24,7 @@ export class StoreController {
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Create store' })
-  create(@Body() data: { name: string; address?: string; phone?: string }) {
+  create(@Body() data: { name: string; address?: string; phone?: string; storeKey: string }) {
     return this.storeService.create(data);
   }
 

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../../common/prisma/prisma.service';
@@ -10,10 +10,40 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async loginWithPin(storeId: string, pin: string) {
-    const staff = await this.prisma.staff.findFirst({
-      where: { storeId, isActive: true },
+  // ===== Validate store key (sk-key) =====
+  async validateStoreKey(storeKey: string) {
+    const store = await this.prisma.store.findUnique({
+      where: { storeKey },
+      select: { id: true, name: true, address: true, logo: true, keyExpireDays: true },
     });
+
+    if (!store) {
+      throw new UnauthorizedException('Store key không hợp lệ');
+    }
+
+    // Return store info + expiry timestamp
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + store.keyExpireDays);
+
+    return {
+      store: {
+        id: store.id,
+        name: store.name,
+        address: store.address,
+        logo: store.logo,
+      },
+      expiresAt: expiresAt.toISOString(),
+      keyExpireDays: store.keyExpireDays,
+    };
+  }
+
+  // ===== Login with PIN (after sk-key validated) =====
+  async loginWithPin(storeId: string, pin: string) {
+    // Verify store exists
+    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
+    if (!store) {
+      throw new NotFoundException('Store không tồn tại');
+    }
 
     // Find staff by checking hashed PINs
     const allStaff = await this.prisma.staff.findMany({
@@ -41,6 +71,19 @@ export class AuthService {
         storeId: matchedStaff.storeId,
       },
     };
+  }
+
+  // ===== Login with store key + PIN in one step =====
+  async loginWithStoreKey(storeKey: string, pin: string) {
+    const store = await this.prisma.store.findUnique({
+      where: { storeKey },
+    });
+
+    if (!store) {
+      throw new UnauthorizedException('Store key không hợp lệ');
+    }
+
+    return this.loginWithPin(store.id, pin);
   }
 
   async hashPin(pin: string): Promise<string> {
