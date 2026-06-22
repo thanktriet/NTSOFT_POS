@@ -30,6 +30,8 @@ interface Order {
 export default function StaffPaymentPage() {
   const router = useRouter();
   const [order, setOrder] = useState<Order | null>(null);
+  const [allItems, setAllItems] = useState<OrderItem[]>([]);
+  const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [method, setMethod] = useState<PaymentMethod>('cash');
   const [discountPercent, setDiscountPercent] = useState(0);
   const [cashReceived, setCashReceived] = useState('');
@@ -44,14 +46,33 @@ export default function StaffPaymentPage() {
     if (stored) {
       const o = JSON.parse(stored);
       setOrder(o);
+      // Load all orders for this table
+      loadTableOrders(o.table?.id || o.tableId);
     } else {
       router.push('/staff/orders');
     }
   }, []);
 
+  const loadTableOrders = async (tableId: string) => {
+    if (!tableId) return;
+    try {
+      const token = localStorage.getItem('token') || '';
+      const orders = await api(`/orders/table/${tableId}`, { token });
+      setAllOrders(orders);
+      // Combine all items from all orders
+      const items = orders.flatMap((o: Order) => o.items || []);
+      setAllItems(items);
+    } catch {
+      // Fallback to single order items
+      if (order?.items) setAllItems(order.items);
+    }
+  };
+
   const token = () => localStorage.getItem('token') || '';
 
-  const subtotal = order ? (order.subtotal || order.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0)) : 0;
+  const subtotal = allItems.length > 0
+    ? allItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
+    : order ? (order.subtotal || order.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0)) : 0;
   const discount = Math.round(subtotal * discountPercent / 100);
   const total = subtotal - discount;
   const cashNum = parseInt(cashReceived.replace(/\D/g, '') || '0');
@@ -155,11 +176,11 @@ export default function StaffPaymentPage() {
       <div className="mx-4 mt-4 bg-dark-600 rounded-xl p-4 border border-dark-400">
         <div className="flex justify-between items-center mb-3 pb-3 border-b border-dashed border-dark-400">
           <h3 className="text-sm font-semibold">Chi tiết hóa đơn</h3>
-          <span className="text-[11px] text-gray-500">#{order.orderNumber}</span>
+          <span className="text-[11px] text-gray-500">Bàn {order.table?.name || '—'} · {allOrders.length} đơn</span>
         </div>
-        {order.items.map((item, i) => (
+        {allItems.map((item, i) => (
           <div key={i} className="flex justify-between text-xs text-gray-300 py-1.5 border-b border-dark-500 last:border-0">
-            <span className="flex-1">{item.menuItem.name}</span>
+            <span className="flex-1">{item.menuItem?.name || '—'}</span>
             <span className="w-8 text-center text-orange-500 font-semibold">x{item.quantity}</span>
             <span className="w-20 text-right">{formatVND(item.unitPrice * item.quantity)}</span>
           </div>
