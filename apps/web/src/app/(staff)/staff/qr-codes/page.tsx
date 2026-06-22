@@ -179,7 +179,16 @@ export default function QrManagementPage() {
               </button>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(table.url);
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(table.url);
+                  } else {
+                    const input = document.createElement('input');
+                    input.value = table.url;
+                    document.body.appendChild(input);
+                    input.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(input);
+                  }
                   alert(`Đã copy: ${table.url}`);
                 }}
                 className="flex-1 py-2 bg-dark-500 border border-dark-400 rounded-lg text-[11px] text-gray-300 font-medium"

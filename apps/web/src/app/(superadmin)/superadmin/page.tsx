@@ -94,7 +94,17 @@ export default function SuperAdminPage() {
   };
 
   const copyKey = (key: string) => {
-    navigator.clipboard.writeText(key);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(key);
+    } else {
+      // Fallback for non-HTTPS / mobile Safari
+      const input = document.createElement('input');
+      input.value = key;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand('copy');
+      document.body.removeChild(input);
+    }
     setMessage(`📋 Đã copy: ${key}`);
   };
 
