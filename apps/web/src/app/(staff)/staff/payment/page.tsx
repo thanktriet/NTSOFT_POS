@@ -63,7 +63,7 @@ export default function StaffPaymentPage() {
       try {
         const storeAuth = localStorage.getItem('store_auth');
         const storeId = storeAuth ? JSON.parse(storeAuth).store.id : 'store-001';
-        const data = await api(`/payments/qr?amount=${total}&table=${order.table.name}&storeId=${storeId}`);
+        const data = await api(`/payments/qr?amount=${total}&table=${order.table?.name || '—'}&storeId=${storeId}`);
         setQrData(data);
       } catch {}
     };
@@ -99,7 +99,7 @@ export default function StaffPaymentPage() {
       const data = await api(`/print/receipt/${order.id}/text`, { token: token() });
       const win = window.open('', '_blank');
       if (win) {
-        win.document.write(`<html><head><title>Bill ${order.table.name}</title><style>body{font-family:monospace;font-size:12px;white-space:pre-wrap;padding:20px;max-width:300px;margin:0 auto}</style></head><body>${data.text}\n\n<button onclick="window.print()">🖨️ In</button></body></html>`);
+        win.document.write(`<html><head><title>Bill ${order.table?.name || '—'}</title><style>body{font-family:monospace;font-size:12px;white-space:pre-wrap;padding:20px;max-width:300px;margin:0 auto}</style></head><body>${data.text}\n\n<button onclick="window.print()">🖨️ In</button></body></html>`);
         win.document.close();
       }
     } catch {}
@@ -123,7 +123,7 @@ export default function StaffPaymentPage() {
             ✅
           </div>
           <h2 className="text-xl font-bold mb-2">Thanh toán thành công!</h2>
-          <p className="text-gray-400 text-sm mb-1">Bàn {order.table.name} · {formatVND(paymentResult?.total || total)}</p>
+          <p className="text-gray-400 text-sm mb-1">Bàn {order.table?.name || '—'} · {formatVND(paymentResult?.total || total)}</p>
           {method === 'cash' && change > 0 && (
             <p className="text-green-400 text-sm font-semibold">Tiền thối: {formatVND(change)}</p>
           )}
@@ -148,7 +148,7 @@ export default function StaffPaymentPage() {
           <Link href="/staff/orders" className="text-xl">←</Link>
           <h1 className="text-base font-semibold">Thanh toán</h1>
         </div>
-        <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-md">Bàn {order.table.name}</span>
+        <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-md">Bàn {order.table?.name || '—'}</span>
       </header>
 
       {/* Bill Detail */}
