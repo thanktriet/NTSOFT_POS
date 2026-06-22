@@ -23,7 +23,8 @@ export default function QrManagementPage() {
 
   const loadQrCodes = async () => {
     try {
-      const data = await api('/qr/store/store-001/all');
+      const baseUrl = window.location.origin;
+      const data = await api(`/qr/store/store-001/all?baseUrl=${encodeURIComponent(baseUrl)}`);
       setTables(data);
     } catch (err) {
       console.error('Failed to load QR codes:', err);

@@ -1,6 +1,6 @@
-import { Controller, Get, Param, Res, Query } from '@nestjs/common';
+import { Controller, Get, Param, Res, Query, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../../common/prisma/prisma.service';
 
@@ -9,10 +9,28 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 export class QrController {
   constructor(private prisma: PrismaService) {}
 
+  // Resolve base URL: query param > store settings > request origin
+  private async resolveBaseUrl(storeId: string, req: Request, baseUrlParam?: string): Promise<string> {
+    if (baseUrlParam) return baseUrlParam;
+
+    // Check store settings for custom domain
+    const store = await this.prisma.store.findUnique({ where: { id: storeId } });
+    const settings = (store?.settings as any) || {};
+    if (settings.domain) return settings.domain;
+
+    // Fall back to request origin
+    const proto = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+    const host = req.headers['x-forwarded-host'] || req.headers['host'] || 'localhost:3000';
+    // Use frontend port (not API port)
+    const hostStr = String(host).replace(':3001', ':2509');
+    return `${proto}://${hostStr}`;
+  }
+
   @Get('table/:tableId')
   @ApiOperation({ summary: 'Generate QR code image for a table' })
   async getTableQr(
     @Param('tableId') tableId: string,
+    @Req() req: Request,
     @Res() res: Response,
     @Query('baseUrl') baseUrl?: string,
   ) {
@@ -25,7 +43,7 @@ export class QrController {
       return res.status(404).json({ message: 'Table not found' });
     }
 
-    const host = baseUrl || 'http://192.168.1.14:6868';
+    const host = await this.resolveBaseUrl(table.storeId, req, baseUrl);
     const orderUrl = `${host}/order/${table.storeId}/${table.id}`;
 
     const qrBuffer = await QRCode.toBuffer(orderUrl, {
@@ -45,6 +63,7 @@ export class QrController {
   @ApiOperation({ summary: 'Generate QR code as SVG' })
   async getTableQrSvg(
     @Param('tableId') tableId: string,
+    @Req() req: Request,
     @Res() res: Response,
     @Query('baseUrl') baseUrl?: string,
   ) {
@@ -57,7 +76,7 @@ export class QrController {
       return res.status(404).json({ message: 'Table not found' });
     }
 
-    const host = baseUrl || 'http://192.168.1.14:6868';
+    const host = await this.resolveBaseUrl(table.storeId, req, baseUrl);
     const orderUrl = `${host}/order/${table.storeId}/${table.id}`;
 
     const svg = await QRCode.toString(orderUrl, {
@@ -75,6 +94,7 @@ export class QrController {
   @ApiOperation({ summary: 'Get QR code data (URL + base64 image)' })
   async getTableQrData(
     @Param('tableId') tableId: string,
+    @Req() req: Request,
     @Query('baseUrl') baseUrl?: string,
   ) {
     const table = await this.prisma.table.findUnique({
@@ -84,7 +104,7 @@ export class QrController {
 
     if (!table) throw new Error('Table not found');
 
-    const host = baseUrl || 'http://192.168.1.14:6868';
+    const host = await this.resolveBaseUrl(table.storeId, req, baseUrl);
     const orderUrl = `${host}/order/${table.storeId}/${table.id}`;
 
     const dataUrl = await QRCode.toDataURL(orderUrl, {
@@ -105,6 +125,7 @@ export class QrController {
   @ApiOperation({ summary: 'Get all tables QR data for a store' })
   async getAllTablesQr(
     @Param('storeId') storeId: string,
+    @Req() req: Request,
     @Query('baseUrl') baseUrl?: string,
   ) {
     const tables = await this.prisma.table.findMany({
@@ -112,7 +133,7 @@ export class QrController {
       orderBy: [{ floor: 'asc' }, { sortOrder: 'asc' }, { name: 'asc' }],
     });
 
-    const host = baseUrl || 'http://192.168.1.14:6868';
+    const host = await this.resolveBaseUrl(storeId, req, baseUrl);
 
     const results = await Promise.all(
       tables.map(async (table) => {
