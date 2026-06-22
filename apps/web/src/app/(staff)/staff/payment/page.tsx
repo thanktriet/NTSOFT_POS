@@ -22,7 +22,8 @@ interface Order {
   discount: number;
   total: number;
   status: string;
-  table: { id: string; name: string };
+  tableId?: string;
+  table?: { id: string; name: string };
   items: OrderItem[];
   createdAt: string;
 }
@@ -46,7 +47,6 @@ export default function StaffPaymentPage() {
     if (stored) {
       const o = JSON.parse(stored);
       setOrder(o);
-      // Load all orders for this table
       loadTableOrders(o.table?.id || o.tableId);
     } else {
       router.push('/staff/orders');
@@ -56,19 +56,14 @@ export default function StaffPaymentPage() {
   const loadTableOrders = async (tableId: string) => {
     if (!tableId) return;
     try {
-      const token = localStorage.getItem('token') || '';
-      const orders = await api(`/orders/table/${tableId}`, { token });
+      const orders = await api(`/orders/table/${tableId}`);
       setAllOrders(orders);
-      // Combine all items from all orders
       const items = orders.flatMap((o: Order) => o.items || []);
       setAllItems(items);
     } catch {
-      // Fallback to single order items
       if (order?.items) setAllItems(order.items);
     }
   };
-
-  const token = () => localStorage.getItem('token') || '';
 
   const subtotal = allItems.length > 0
     ? allItems.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
@@ -78,32 +73,31 @@ export default function StaffPaymentPage() {
   const cashNum = parseInt(cashReceived.replace(/\D/g, '') || '0');
   const change = cashNum - total;
 
+  // Always load QR
   useEffect(() => {
-    if (!order || method !== 'qr_transfer' || total <= 0) return;
+    if (!order || total <= 0) return;
     const loadQr = async () => {
       try {
         const storeAuth = localStorage.getItem('store_auth');
         const storeId = storeAuth ? JSON.parse(storeAuth).store.id : 'store-001';
-        const data = await api(`/payments/qr?amount=${total}&table=${order.table?.name || '—'}&storeId=${storeId}`);
+        const data = await api(`/payments/qr?amount=${total}&table=${order.table?.name || ''}&storeId=${storeId}`);
         setQrData(data);
       } catch {}
     };
     loadQr();
-  }, [method, total, order]);
+  }, [total, order]);
 
   const handlePayment = async () => {
     if (!order) return;
     setProcessing(true);
     setError('');
     try {
-      // Process ALL unpaid orders on this table
       const ordersToProcess = allOrders.length > 0
         ? allOrders.filter((o) => o.status !== 'paid' && o.status !== 'cancelled')
         : [order];
 
-      let lastResult = null;
       for (const o of ordersToProcess) {
-        const result = await api(`/payments/process/${o.id}`, {
+        await api(`/payments/process/${o.id}`, {
           method: 'POST',
           body: {
             method,
@@ -111,7 +105,6 @@ export default function StaffPaymentPage() {
             received: method === 'cash' ? cashNum : undefined,
           },
         });
-        lastResult = result;
       }
 
       setPaymentResult({ total, method, received: cashNum, change });
@@ -123,19 +116,47 @@ export default function StaffPaymentPage() {
     setProcessing(false);
   };
 
-  const printBill = async () => {
+  const printBill = () => {
     if (!order) return;
-    try {
-      const data = await api(`/print/receipt/${order.id}/text`, { token: token() });
-      const win = window.open('', '_blank');
-      if (win) {
-        win.document.write(`<html><head><title>Bill ${order.table?.name || '—'}</title><style>body{font-family:monospace;font-size:12px;white-space:pre-wrap;padding:20px;max-width:300px;margin:0 auto}</style></head><body>${data.text}\n\n<button onclick="window.print()">🖨️ In</button></body></html>`);
-        win.document.close();
-      }
-    } catch {}
+    const tableName = order.table?.name || '—';
+    const now = new Date();
+    const timeStr = now.toLocaleString('vi-VN');
+    const itemsHtml = allItems.map((item) =>
+      `<tr><td style="padding:3px 0">${item.quantity}x ${item.menuItem?.name || '—'}</td><td style="text-align:right;padding:3px 0">${formatVND(item.unitPrice * item.quantity)}</td></tr>`
+    ).join('');
+
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bill ${tableName}</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;width:280px;margin:0 auto;padding:16px}
+.center{text-align:center}.bold{font-weight:bold}.big{font-size:16px}.sep{border-top:1px dashed #000;margin:8px 0}
+table{width:100%;border-collapse:collapse}.right{text-align:right}.total-row{font-size:14px;font-weight:bold}
+.qr-section{text-align:center;margin:12px 0}.qr-section img{width:160px;height:auto}
+.footer{text-align:center;margin-top:12px;font-size:11px;color:#666}
+@media print{.no-print{display:none}body{padding:0;width:100%}}</style></head>
+<body>
+<div class="center bold big">Nam Thắng Beer & Food</div>
+<div class="center" style="font-size:11px;margin-top:4px">123 Nguyễn Huệ, Q.1, TP.HCM<br>ĐT: 0901234567</div>
+<div class="sep"></div>
+<div class="center bold" style="font-size:14px;margin:8px 0">HÓA ĐƠN THANH TOÁN</div>
+<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span>Bàn: <b>${tableName}</b></span><span>${timeStr}</span></div>
+<div class="sep"></div>
+<table>${itemsHtml}</table>
+<div class="sep"></div>
+<table>
+<tr><td>Tạm tính</td><td class="right">${formatVND(subtotal)}</td></tr>
+${discount > 0 ? `<tr><td>Giảm giá (${discountPercent}%)</td><td class="right" style="color:green">-${formatVND(discount)}</td></tr>` : ''}
+<tr class="total-row"><td style="padding-top:6px">TỔNG CỘNG</td><td class="right" style="padding-top:6px">${formatVND(total)}</td></tr>
+</table>
+${qrData ? `<div class="qr-section"><div class="sep"></div><p style="font-size:11px;margin-bottom:6px;font-weight:bold">Quét QR để thanh toán</p><img src="${qrData.qrUrl}" alt="VietQR"/><p style="font-size:10px;margin-top:4px">${qrData.accountName || ''}<br>STK: ${qrData.accountNumber || ''}</p></div>` : ''}
+<div class="sep"></div>
+<div class="footer">Cảm ơn quý khách! 🍺<br>Hẹn gặp lại</div>
+<div class="no-print" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="padding:10px 24px;background:#f97316;color:white;border:none;border-radius:8px;font-size:14px;cursor:pointer">🖨️ In bill</button></div>
+</body></html>`;
+
+    const win = window.open('', '_blank');
+    if (win) { win.document.write(html); win.document.close(); }
   };
 
-  // Loading state
+  // Loading
   if (!order) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -144,25 +165,25 @@ export default function StaffPaymentPage() {
     );
   }
 
-  // ===== Success Screen =====
+  // ===== Success =====
   if (paid) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center px-6 animate-fadeInUp">
-        <div className="text-center">
-          <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 animate-bounceIn">
-            ✅
-          </div>
-          <h2 className="text-xl font-bold mb-2">Thanh toán thành công!</h2>
-          <p className="text-gray-400 text-sm mb-1">Bàn {order.table?.name || '—'} · {formatVND(paymentResult?.total || total)}</p>
+        <div className="text-center w-full max-w-[340px]">
+          <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 animate-bounceIn">✅</div>
+          <h2 className="text-xl font-bold mb-1">Thanh toán thành công!</h2>
+          <p className="text-gray-400 text-sm">Bàn {order.table?.name || '—'} · {formatVND(total)}</p>
           {method === 'cash' && change > 0 && (
-            <p className="text-green-400 text-sm font-semibold">Tiền thối: {formatVND(change)}</p>
+            <div className="mt-3 p-3 bg-green-500/10 border border-green-500/30 rounded-xl">
+              <span className="text-green-400 text-sm font-semibold">Tiền thối: {formatVND(change)}</span>
+            </div>
           )}
-          <div className="flex gap-3 mt-6">
-            <button onClick={printBill} className="flex-1 py-3 bg-dark-600 border border-dark-400 rounded-xl text-sm font-semibold text-gray-300">
+          <div className="grid grid-cols-2 gap-3 mt-6">
+            <button onClick={printBill} className="py-3.5 bg-dark-600 border border-dark-400 rounded-xl text-sm font-semibold text-gray-300 active:scale-95 transition-transform">
               🖨️ In bill
             </button>
-            <Link href="/staff/orders" className="flex-1 py-3 bg-orange-500 rounded-xl text-sm font-semibold text-white text-center">
-              Đơn hàng →
+            <Link href="/staff/orders" className="py-3.5 bg-orange-500 rounded-xl text-sm font-semibold text-white text-center active:scale-95 transition-transform">
+              Hoàn tất →
             </Link>
           </div>
         </div>
@@ -170,140 +191,177 @@ export default function StaffPaymentPage() {
     );
   }
 
+  // ===== Main Payment UI =====
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-28">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-dark-800 px-4 py-4 flex items-center justify-between border-b border-dark-400">
+      <header className="sticky top-0 z-50 bg-dark-800 px-4 py-3 flex items-center justify-between border-b border-dark-400">
         <div className="flex items-center gap-3">
-          <Link href="/staff/orders" className="text-xl">←</Link>
-          <h1 className="text-base font-semibold">Thanh toán</h1>
+          <Link href="/staff/orders" className="text-lg">←</Link>
+          <div>
+            <h1 className="text-sm font-semibold">Thanh toán</h1>
+            <span className="text-[10px] text-gray-500">{allItems.length} món · {allOrders.length} đơn</span>
+          </div>
         </div>
-        <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-md">Bàn {order.table?.name || '—'}</span>
+        <div className="flex items-center gap-2">
+          <button onClick={printBill} className="bg-dark-500 border border-dark-400 px-3 py-1.5 rounded-lg text-xs text-gray-300 active:scale-95 transition-transform">
+            🖨️ In bill
+          </button>
+          <span className="bg-orange-500 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg">
+            {order.table?.name || '—'}
+          </span>
+        </div>
       </header>
 
-      {/* Bill Detail */}
-      <div className="mx-4 mt-4 bg-dark-600 rounded-xl p-4 border border-dark-400">
-        <div className="flex justify-between items-center mb-3 pb-3 border-b border-dashed border-dark-400">
-          <h3 className="text-sm font-semibold">Chi tiết hóa đơn</h3>
-          <span className="text-[11px] text-gray-500">Bàn {order.table?.name || '—'} · {allOrders.length} đơn</span>
-        </div>
-        {allItems.map((item, i) => (
-          <div key={i} className="flex justify-between text-xs text-gray-300 py-1.5 border-b border-dark-500 last:border-0">
-            <span className="flex-1">{item.menuItem?.name || '—'}</span>
-            <span className="w-8 text-center text-orange-500 font-semibold">x{item.quantity}</span>
-            <span className="w-20 text-right">{formatVND(item.unitPrice * item.quantity)}</span>
-          </div>
-        ))}
-        <div className="border-t border-dashed border-dark-400 mt-3 pt-3 space-y-1">
-          <div className="flex justify-between text-xs text-gray-400">
-            <span>Tạm tính</span><span>{formatVND(subtotal)}</span>
-          </div>
-          {discount > 0 && (
-            <div className="flex justify-between text-xs text-green-400">
-              <span>Giảm giá ({discountPercent}%)</span><span>-{formatVND(discount)}</span>
+      {/* Bill + QR side by side on larger screens */}
+      <div className="px-4 mt-4 space-y-4">
+
+        {/* QR Payment - Always visible on top */}
+        {qrData && (
+          <div className="bg-dark-600 rounded-2xl p-4 border border-dark-400">
+            <div className="flex items-start gap-4">
+              <div className="bg-white rounded-xl p-2 flex-shrink-0">
+                <img src={qrData.qrUrl} alt="VietQR" className="w-28 h-28" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xs font-semibold text-gray-400 uppercase mb-1">Quét QR thanh toán</h3>
+                <p className="text-xl font-bold text-orange-500">{formatVND(total)}</p>
+                <div className="mt-2 space-y-0.5">
+                  <p className="text-xs text-gray-300">{qrData.accountName}</p>
+                  <p className="text-[11px] text-gray-500">STK: {qrData.accountNumber}</p>
+                  <p className="text-[10px] text-gray-600">ND: {qrData.content}</p>
+                </div>
+              </div>
             </div>
-          )}
-          <div className="flex justify-between text-lg font-bold pt-2">
-            <span>Tổng</span><span className="text-orange-500">{formatVND(total)}</span>
+          </div>
+        )}
+
+        {/* Bill Detail */}
+        <div className="bg-dark-600 rounded-2xl p-4 border border-dark-400">
+          <div className="flex justify-between items-center mb-3 pb-3 border-b border-dashed border-dark-400">
+            <h3 className="text-sm font-semibold">🧾 Chi tiết hóa đơn</h3>
+            <span className="text-[11px] text-gray-500">Bàn {order.table?.name || '—'}</span>
+          </div>
+
+          {/* Items */}
+          <div className="max-h-48 overflow-y-auto space-y-0">
+            {allItems.map((item, i) => (
+              <div key={i} className="flex items-center justify-between py-2 border-b border-dark-500 last:border-0">
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs text-gray-200">{item.menuItem?.name || '—'}</span>
+                  {item.note && <span className="text-[9px] text-yellow-500 ml-1">📝</span>}
+                </div>
+                <span className="text-[11px] text-orange-500 font-semibold mx-2">x{item.quantity}</span>
+                <span className="text-xs text-gray-300 w-20 text-right">{formatVND(item.unitPrice * item.quantity)}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Totals */}
+          <div className="border-t border-dashed border-dark-400 mt-3 pt-3">
+            <div className="flex justify-between text-xs text-gray-400 mb-1">
+              <span>Tạm tính ({allItems.length} món)</span>
+              <span>{formatVND(subtotal)}</span>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-xs text-green-400 mb-1">
+                <span>Giảm giá ({discountPercent}%)</span>
+                <span>-{formatVND(discount)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center pt-2 mt-1 border-t border-dark-400">
+              <span className="text-sm font-bold">Tổng thanh toán</span>
+              <span className="text-xl font-bold text-orange-500">{formatVND(total)}</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Discount */}
-      <div className="mx-4 mt-3 bg-dark-600 rounded-xl p-4 border border-dark-400">
-        <h3 className="text-xs font-semibold mb-3">Giảm giá</h3>
-        <div className="flex gap-1.5">
-          {[0, 5, 10, 15, 20].map((pct) => (
-            <button
-              key={pct}
-              onClick={() => setDiscountPercent(pct)}
-              className={cn('flex-1 py-2 rounded-lg text-xs font-semibold border', discountPercent === pct ? 'border-orange-500 text-orange-500 bg-orange-500/10' : 'border-dark-400 text-gray-500')}
-            >
-              {pct === 0 ? '0%' : `${pct}%`}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Payment Method */}
-      <div className="mx-4 mt-3 bg-dark-600 rounded-xl p-4 border border-dark-400">
-        <h3 className="text-xs font-semibold mb-3">Phương thức</h3>
-        <div className="grid grid-cols-4 gap-2">
-          {([
-            { key: 'cash', icon: '💵', label: 'Mặt' },
-            { key: 'qr_transfer', icon: '📱', label: 'QR' },
-            { key: 'card', icon: '💳', label: 'Thẻ' },
-            { key: 'mixed', icon: '🔀', label: 'Hỗn hợp' },
-          ] as const).map((pm) => (
-            <button
-              key={pm.key}
-              onClick={() => setMethod(pm.key)}
-              className={cn('p-3 rounded-xl border text-center', method === pm.key ? 'border-orange-500 bg-orange-500/10' : 'border-dark-400 bg-dark-500')}
-            >
-              <div className="text-lg mb-0.5">{pm.icon}</div>
-              <div className={cn('text-[10px]', method === pm.key ? 'text-orange-500 font-semibold' : 'text-gray-400')}>{pm.label}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Cash Input */}
-      {method === 'cash' && (
-        <div className="mx-4 mt-3 bg-dark-600 rounded-xl p-4 border border-dark-400">
-          <h3 className="text-xs font-semibold mb-3">Khách đưa</h3>
-          <input
-            type="text"
-            value={cashReceived}
-            onChange={(e) => setCashReceived(e.target.value.replace(/\D/g, ''))}
-            placeholder={total.toString()}
-            className="w-full bg-dark-500 border border-dark-400 rounded-lg px-4 py-3 text-white text-lg font-bold text-right outline-none focus:border-orange-500"
-          />
-          <div className="grid grid-cols-3 gap-1.5 mt-3">
-            {[total, Math.ceil(total / 100000) * 100000, Math.ceil(total / 500000) * 500000, 1000000, 2000000].filter((v, i, a) => a.indexOf(v) === i).slice(0, 5).map((preset) => (
-              <button key={preset} onClick={() => setCashReceived(preset.toString())} className="py-2 bg-dark-500 border border-dark-400 rounded-lg text-[11px] text-gray-400">
-                {formatVND(preset)}
+        {/* Discount */}
+        <div className="bg-dark-600 rounded-2xl p-4 border border-dark-400">
+          <h3 className="text-xs font-semibold mb-3 text-gray-400 uppercase">Giảm giá</h3>
+          <div className="flex gap-1.5">
+            {[0, 5, 10, 15, 20, 30].map((pct) => (
+              <button
+                key={pct}
+                onClick={() => setDiscountPercent(pct)}
+                className={cn('flex-1 py-2.5 rounded-lg text-xs font-semibold border transition-all', discountPercent === pct ? 'border-orange-500 text-orange-500 bg-orange-500/10' : 'border-dark-400 text-gray-500')}
+              >
+                {pct}%
               </button>
             ))}
-            <button onClick={() => setCashReceived(total.toString())} className="py-2 bg-dark-500 border border-dark-400 rounded-lg text-[11px] text-gray-400">
-              Đúng tiền
-            </button>
           </div>
-          {cashNum >= total && cashNum > 0 && (
-            <div className="mt-3 p-3 bg-green-500/10 rounded-lg flex justify-between">
-              <span className="text-sm text-green-400">Tiền thối</span>
-              <span className="text-sm text-green-400 font-bold">{formatVND(change)}</span>
+        </div>
+
+        {/* Payment Method */}
+        <div className="bg-dark-600 rounded-2xl p-4 border border-dark-400">
+          <h3 className="text-xs font-semibold mb-3 text-gray-400 uppercase">Phương thức thanh toán</h3>
+          <div className="grid grid-cols-4 gap-2">
+            {([
+              { key: 'cash', icon: '💵', label: 'Tiền mặt' },
+              { key: 'qr_transfer', icon: '📱', label: 'QR Bank' },
+              { key: 'card', icon: '💳', label: 'Thẻ' },
+              { key: 'mixed', icon: '🔀', label: 'Hỗn hợp' },
+            ] as const).map((pm) => (
+              <button
+                key={pm.key}
+                onClick={() => setMethod(pm.key)}
+                className={cn('p-3 rounded-xl border text-center transition-all active:scale-95', method === pm.key ? 'border-orange-500 bg-orange-500/10' : 'border-dark-400 bg-dark-500')}
+              >
+                <div className="text-xl mb-1">{pm.icon}</div>
+                <div className={cn('text-[10px] leading-tight', method === pm.key ? 'text-orange-500 font-semibold' : 'text-gray-400')}>{pm.label}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Cash Input */}
+        {method === 'cash' && (
+          <div className="bg-dark-600 rounded-2xl p-4 border border-dark-400">
+            <h3 className="text-xs font-semibold mb-3 text-gray-400 uppercase">Khách đưa</h3>
+            <input
+              type="text"
+              value={cashReceived ? formatVND(cashNum).replace('đ', '') : ''}
+              onChange={(e) => setCashReceived(e.target.value.replace(/\D/g, ''))}
+              placeholder={formatVND(total)}
+              className="w-full bg-dark-500 border border-dark-400 rounded-xl px-4 py-3.5 text-white text-xl font-bold text-right outline-none focus:border-orange-500 transition-colors"
+            />
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              {[total, Math.ceil(total / 100000) * 100000, Math.ceil(total / 500000) * 500000, 1000000, 2000000, 5000000]
+                .filter((v, i, a) => v > 0 && a.indexOf(v) === i)
+                .slice(0, 6)
+                .map((preset) => (
+                  <button key={preset} onClick={() => setCashReceived(preset.toString())} className="py-2.5 bg-dark-500 border border-dark-400 rounded-lg text-[11px] text-gray-400 active:border-orange-500 active:text-orange-500 transition-colors">
+                    {formatVND(preset)}
+                  </button>
+                ))}
             </div>
-          )}
-        </div>
-      )}
-
-      {/* QR Display */}
-      {method === 'qr_transfer' && qrData && (
-        <div className="mx-4 mt-3 bg-dark-600 rounded-xl p-4 border border-dark-400 text-center">
-          <h3 className="text-xs font-semibold mb-3">QR Thanh toán</h3>
-          <div className="bg-white rounded-xl p-2 inline-block">
-            <img src={qrData.qrUrl} alt="VietQR" className="w-44 h-auto" />
+            {cashNum >= total && cashNum > 0 && (
+              <div className="mt-3 p-3 bg-green-500/10 border border-green-500/30 rounded-xl flex justify-between items-center">
+                <span className="text-sm text-green-400">Tiền thối</span>
+                <span className="text-lg text-green-400 font-bold">{formatVND(change)}</span>
+              </div>
+            )}
           </div>
-          <p className="text-[11px] text-gray-400 mt-2">{qrData.accountName}</p>
-          <p className="text-[11px] text-gray-500">STK: {qrData.accountNumber}</p>
-          <p className="text-xs text-orange-500 font-semibold mt-1">{formatVND(total)}</p>
-        </div>
-      )}
+        )}
 
-      {/* Error */}
-      {error && <div className="mx-4 mt-3 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-xs text-red-400 text-center">{error}</div>}
+        {/* Error */}
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-xs text-red-400 text-center">{error}</div>
+        )}
+      </div>
 
-      {/* Bottom */}
-      <div className="fixed bottom-0 left-0 right-0 max-w-[390px] mx-auto bg-dark-700 p-4 border-t border-dark-400 flex gap-2">
-        <button onClick={printBill} className="py-3.5 px-4 bg-dark-500 rounded-xl text-sm font-semibold text-gray-300">
-          🖨️
-        </button>
+      {/* Bottom Fixed Bar */}
+      <div className="fixed bottom-0 left-0 right-0 max-w-[390px] mx-auto bg-dark-800 border-t border-dark-400 p-4 space-y-2">
         <button
           onClick={handlePayment}
           disabled={processing || (method === 'cash' && cashNum < total)}
-          className="flex-1 py-3.5 bg-green-500 rounded-xl text-sm font-semibold text-white disabled:opacity-50"
+          className="w-full py-4 bg-green-500 rounded-xl text-base font-bold text-white disabled:opacity-50 active:scale-[0.98] transition-transform flex items-center justify-center gap-2"
         >
-          {processing ? '⏳ Đang xử lý...' : `✓ Thanh toán · ${formatVND(total)}`}
+          {processing ? (
+            <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> Đang xử lý...</>
+          ) : (
+            <>✓ Xác nhận thanh toán · {formatVND(total)}</>
+          )}
         </button>
       </div>
     </div>
