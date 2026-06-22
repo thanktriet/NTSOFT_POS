@@ -96,16 +96,25 @@ export default function StaffPaymentPage() {
     setProcessing(true);
     setError('');
     try {
-      const result = await api(`/payments/process/${order.id}`, {
-        method: 'POST',
-        token: token(),
-        body: {
-          method,
-          discount,
-          received: method === 'cash' ? cashNum : undefined,
-        },
-      });
-      setPaymentResult(result.payment);
+      // Process ALL unpaid orders on this table
+      const ordersToProcess = allOrders.length > 0
+        ? allOrders.filter((o) => o.status !== 'paid' && o.status !== 'cancelled')
+        : [order];
+
+      let lastResult = null;
+      for (const o of ordersToProcess) {
+        const result = await api(`/payments/process/${o.id}`, {
+          method: 'POST',
+          body: {
+            method,
+            discount: Math.round((o.subtotal || o.total) * discountPercent / 100),
+            received: method === 'cash' ? cashNum : undefined,
+          },
+        });
+        lastResult = result;
+      }
+
+      setPaymentResult({ total, method, received: cashNum, change });
       setPaid(true);
       localStorage.removeItem('payment_order');
     } catch (err: any) {
