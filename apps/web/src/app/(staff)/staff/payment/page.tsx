@@ -51,21 +51,27 @@ export default function StaffPaymentPage() {
 
   const token = () => localStorage.getItem('token') || '';
 
-  if (!order) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  const subtotal = order.subtotal || order.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
+  const subtotal = order ? (order.subtotal || order.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0)) : 0;
   const discount = Math.round(subtotal * discountPercent / 100);
   const total = subtotal - discount;
   const cashNum = parseInt(cashReceived.replace(/\D/g, '') || '0');
   const change = cashNum - total;
 
+  useEffect(() => {
+    if (!order || method !== 'qr_transfer' || total <= 0) return;
+    const loadQr = async () => {
+      try {
+        const storeAuth = localStorage.getItem('store_auth');
+        const storeId = storeAuth ? JSON.parse(storeAuth).store.id : 'store-001';
+        const data = await api(`/payments/qr?amount=${total}&table=${order.table.name}&storeId=${storeId}`);
+        setQrData(data);
+      } catch {}
+    };
+    loadQr();
+  }, [method, total, order]);
+
   const handlePayment = async () => {
+    if (!order) return;
     setProcessing(true);
     setError('');
     try {
@@ -87,21 +93,8 @@ export default function StaffPaymentPage() {
     setProcessing(false);
   };
 
-  const loadQr = async () => {
-    if (!order) return;
-    try {
-      const storeAuth = localStorage.getItem('store_auth');
-      const storeId = storeAuth ? JSON.parse(storeAuth).store.id : 'store-001';
-      const data = await api(`/payments/qr?amount=${total}&table=${order.table.name}&storeId=${storeId}`);
-      setQrData(data);
-    } catch {}
-  };
-
-  useEffect(() => {
-    if (order && method === 'qr_transfer' && total > 0) loadQr();
-  }, [method, total, order]);
-
   const printBill = async () => {
+    if (!order) return;
     try {
       const data = await api(`/print/receipt/${order.id}/text`, { token: token() });
       const win = window.open('', '_blank');
@@ -111,6 +104,15 @@ export default function StaffPaymentPage() {
       }
     } catch {}
   };
+
+  // Loading state
+  if (!order) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   // ===== Success Screen =====
   if (paid) {
