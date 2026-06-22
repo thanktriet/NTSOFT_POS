@@ -131,6 +131,19 @@ export class OrderService {
     });
   }
 
+  // ===== Transfer Order to Another Table =====
+
+  async transferTable(orderId: string, newTableId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('Order not found');
+
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { tableId: newTableId },
+      include: { items: { include: { menuItem: true } }, table: true },
+    });
+  }
+
   // ===== Add Items to Existing Order =====
 
   async addItems(

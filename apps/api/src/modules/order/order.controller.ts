@@ -67,6 +67,14 @@ export class OrderController {
     return this.orderService.updateStatus(id, data.status);
   }
 
+  @Put(':id/transfer')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Transfer order to another table' })
+  transferTable(@Param('id') id: string, @Body() data: { newTableId: string }) {
+    return this.orderService.transferTable(id, data.newTableId);
+  }
+
   @Post(':id/items')
   @ApiOperation({ summary: 'Add items to existing order' })
   addItems(
