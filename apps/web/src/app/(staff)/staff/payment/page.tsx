@@ -88,6 +88,7 @@ export default function StaffPaymentPage() {
   };
 
   const loadQr = async () => {
+    if (!order) return;
     try {
       const storeAuth = localStorage.getItem('store_auth');
       const storeId = storeAuth ? JSON.parse(storeAuth).store.id : 'store-001';
@@ -97,8 +98,8 @@ export default function StaffPaymentPage() {
   };
 
   useEffect(() => {
-    if (method === 'qr_transfer' && total > 0) loadQr();
-  }, [method, total]);
+    if (order && method === 'qr_transfer' && total > 0) loadQr();
+  }, [method, total, order]);
 
   const printBill = async () => {
     try {
