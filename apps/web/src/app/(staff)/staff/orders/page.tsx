@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useSocket } from '@/hooks/use-socket';
 import { api } from '@/lib/api';
 import { formatVND, cn } from '@/lib/utils';
 
@@ -9,16 +11,27 @@ const STORE_ID = 'store-001';
 
 type OrderStatus = 'pending' | 'confirmed' | 'cooking' | 'served' | 'paid' | 'cancelled';
 
+interface OrderItem {
+  id: string;
+  menuItem: { id: string; name: string };
+  quantity: number;
+  unitPrice: number;
+  status: string;
+  note?: string;
+}
+
 interface Order {
   id: string;
   orderNumber: number;
   status: OrderStatus;
   source: 'qr' | 'staff';
   total: number;
+  subtotal: number;
+  discount: number;
   createdAt: string;
-  table: { name: string };
+  table: { id: string; name: string };
   staff?: { name: string };
-  items: Array<{ menuItem: { name: string }; quantity: number; unitPrice: number }>;
+  items: OrderItem[];
 }
 
 const STATUS_MAP: Record<OrderStatus, { label: string; class: string }> = {
@@ -31,43 +44,122 @@ const STATUS_MAP: Record<OrderStatus, { label: string; class: string }> = {
 };
 
 export default function StaffOrdersPage() {
+  const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [filter, setFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [billPreview, setBillPreview] = useState<Order | null>(null);
+  const [message, setMessage] = useState('');
+
+  const { on } = useSocket({ storeId: STORE_ID, role: 'staff' });
 
   useEffect(() => { loadOrders(); }, []);
 
+  useEffect(() => {
+    const unsub1 = on('order:created', () => loadOrders());
+    const unsub2 = on('order:updated', () => loadOrders());
+    const unsub3 = on('item:status', () => loadOrders());
+    return () => { unsub1?.(); unsub2?.(); unsub3?.(); };
+  }, [on]);
+
+  const token = () => localStorage.getItem('token') || '';
+
   const loadOrders = async () => {
     try {
-      const token = localStorage.getItem('token') || '';
-      const data = await api(`/orders/store/${STORE_ID}`, { token });
+      const data = await api(`/orders/store/${STORE_ID}`, { token: token() });
       setOrders(data);
     } catch {
-      setOrders(MOCK_ORDERS);
-    } finally {
-      setLoading(false);
+      setMessage('Lỗi tải đơn hàng');
+    }
+    setLoading(false);
+  };
+
+  // ===== Actions =====
+
+  const confirmOrder = async (orderId: string) => {
+    setActionLoading(orderId);
+    try {
+      await api(`/orders/${orderId}/status`, { method: 'PUT', token: token(), body: { status: 'confirmed' } });
+      setMessage('✅ Đã xác nhận đơn');
+      loadOrders();
+    } catch { setMessage('❌ Lỗi xác nhận'); }
+    setActionLoading(null);
+  };
+
+  const markServed = async (orderId: string) => {
+    setActionLoading(orderId);
+    try {
+      await api(`/orders/${orderId}/status`, { method: 'PUT', token: token(), body: { status: 'served' } });
+      setMessage('✅ Đã phục vụ');
+      loadOrders();
+    } catch { setMessage('❌ Lỗi'); }
+    setActionLoading(null);
+  };
+
+  const cancelOrder = async (orderId: string) => {
+    if (!confirm('Xác nhận hủy đơn?')) return;
+    setActionLoading(orderId);
+    try {
+      await api(`/orders/${orderId}/status`, { method: 'PUT', token: token(), body: { status: 'cancelled' } });
+      setMessage('✅ Đã hủy đơn');
+      loadOrders();
+    } catch { setMessage('❌ Lỗi'); }
+    setActionLoading(null);
+  };
+
+  const printBillPreview = async (order: Order) => {
+    try {
+      const data = await api(`/print/receipt/${order.id}/text`, { token: token() });
+      // Open print preview
+      const win = window.open('', '_blank');
+      if (win) {
+        win.document.write(`<html><head><title>Bill ${order.table.name}</title><style>body{font-family:monospace;font-size:12px;white-space:pre-wrap;padding:20px;max-width:300px;margin:0 auto}@media print{body{padding:0}}</style></head><body>${data.text}\n\n<button onclick="window.print()" style="margin-top:20px;padding:8px 16px">🖨️ In</button></body></html>`);
+        win.document.close();
+      }
+    } catch {
+      setMessage('❌ Lỗi tạo bill');
     }
   };
 
-  const filtered = filter === 'all'
-    ? orders
-    : orders.filter((o) => o.status === filter);
+  const goToPayment = (order: Order) => {
+    localStorage.setItem('payment_order', JSON.stringify(order));
+    router.push('/staff/payment');
+  };
+
+  const filtered = filter === 'all' ? orders : orders.filter((o) => o.status === filter);
 
   const filters = [
     { key: 'all', label: 'Tất cả' },
+    { key: 'pending', label: 'Chờ xác nhận' },
     { key: 'cooking', label: 'Đang chế biến' },
     { key: 'served', label: 'Đã phục vụ' },
-    { key: 'pending', label: 'Chờ TT' },
     { key: 'paid', label: 'Đã TT' },
   ];
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen pb-20">
-      {/* Header */}
       <header className="sticky top-0 z-50 bg-dark-800 px-4 py-4 flex items-center gap-3 border-b border-dark-400">
         <Link href="/staff" className="text-xl">←</Link>
         <h1 className="text-base font-semibold">Đơn hàng</h1>
+        <span className="text-xs text-gray-500 ml-auto">{orders.length} đơn</span>
       </header>
+
+      {/* Message */}
+      {message && (
+        <div className="mx-4 mt-3 p-2.5 bg-dark-700 border border-dark-400 rounded-lg text-xs text-center animate-fadeIn">
+          {message}
+          <button onClick={() => setMessage('')} className="ml-2 text-gray-600">✕</button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex gap-1.5 px-4 py-3 overflow-x-auto scrollbar-hide">
@@ -83,16 +175,23 @@ export default function StaffOrdersPage() {
             )}
           >
             {f.label}
+            {f.key !== 'all' && (
+              <span className="ml-1 opacity-70">
+                {orders.filter((o) => o.status === f.key).length}
+              </span>
+            )}
           </button>
         ))}
       </div>
 
       {/* Order List */}
-      <div className="px-4 space-y-3 pb-4">
+      <div className="px-4 space-y-3 pb-4 stagger-children">
         {filtered.map((order) => {
           const statusInfo = STATUS_MAP[order.status];
+          const isLoading = actionLoading === order.id;
+
           return (
-            <div key={order.id} className="bg-dark-600 rounded-xl p-4 border border-dark-400">
+            <div key={order.id} className={cn('bg-dark-600 rounded-xl p-4 border border-dark-400', isLoading && 'opacity-50')}>
               {/* Header */}
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -100,6 +199,7 @@ export default function StaffOrdersPage() {
                     {order.table.name}
                   </span>
                   <span className="text-[11px] text-gray-500">#{order.orderNumber.toString().padStart(4, '0')}</span>
+                  <span className="text-[10px] text-gray-600">{order.source === 'qr' ? '📱QR' : '👤NV'}</span>
                 </div>
                 <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', statusInfo.class)}>
                   {statusInfo.label}
@@ -108,44 +208,74 @@ export default function StaffOrdersPage() {
 
               {/* Items */}
               <div className="space-y-1 mb-3">
-                {order.items.slice(0, 3).map((item, i) => (
+                {order.items.map((item, i) => (
                   <div key={i} className="flex justify-between text-xs text-gray-300">
-                    <span><span className="text-orange-500 font-semibold">{item.quantity}x</span> {item.menuItem.name}</span>
+                    <span>
+                      <span className="text-orange-500 font-semibold">{item.quantity}x</span> {item.menuItem.name}
+                      {item.note && <span className="text-yellow-500 ml-1">📝</span>}
+                    </span>
                     <span className="text-gray-500">{formatVND(item.unitPrice * item.quantity)}</span>
                   </div>
                 ))}
-                {order.items.length > 3 && (
-                  <p className="text-[10px] text-gray-500">+{order.items.length - 3} món khác</p>
-                )}
               </div>
 
               {/* Footer */}
               <div className="flex items-center justify-between pt-3 border-t border-dark-400">
                 <div className="text-[11px] text-gray-500">
-                  <span>{order.source === 'qr' ? '📱 QR' : `👤 ${order.staff?.name || ''}`}</span>
-                  <span className="ml-2">
-                    {new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  {new Date(order.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                  {order.staff && ` · ${order.staff.name}`}
                 </div>
                 <span className="text-base font-bold text-orange-500">{formatVND(order.total)}</span>
               </div>
 
               {/* Actions */}
-              {order.status !== 'paid' && order.status !== 'cancelled' && (
-                <div className="flex gap-2 mt-3">
-                  <button className="flex-1 py-2 bg-dark-500 rounded-lg text-[11px] font-semibold text-gray-400">
-                    Chi tiết
-                  </button>
-                  {order.status !== 'served' && (
-                    <button className="flex-1 py-2 bg-blue-500 rounded-lg text-[11px] font-semibold text-white">
-                      + Thêm món
+              <div className="flex gap-2 mt-3">
+                {/* Pending → Confirm */}
+                {order.status === 'pending' && (
+                  <>
+                    <button onClick={() => confirmOrder(order.id)} disabled={isLoading} className="flex-1 py-2 bg-green-500 rounded-lg text-[11px] font-semibold text-white disabled:opacity-50">
+                      ✓ Xác nhận
                     </button>
-                  )}
-                  <button className="flex-1 py-2 bg-green-500 rounded-lg text-[11px] font-semibold text-white">
-                    Thanh toán
-                  </button>
-                </div>
-              )}
+                    <button onClick={() => cancelOrder(order.id)} disabled={isLoading} className="py-2 px-3 bg-red-500/10 border border-red-500/30 rounded-lg text-[11px] font-semibold text-red-400 disabled:opacity-50">
+                      Hủy
+                    </button>
+                  </>
+                )}
+
+                {/* Confirmed/Cooking → Print bill + Payment */}
+                {(order.status === 'confirmed' || order.status === 'cooking') && (
+                  <>
+                    <button onClick={() => printBillPreview(order)} className="flex-1 py-2 bg-dark-500 rounded-lg text-[11px] font-semibold text-gray-300">
+                      🖨️ In bill tạm
+                    </button>
+                    <button onClick={() => markServed(order.id)} disabled={isLoading} className="flex-1 py-2 bg-blue-500 rounded-lg text-[11px] font-semibold text-white disabled:opacity-50">
+                      🍽️ Đã phục vụ
+                    </button>
+                  </>
+                )}
+
+                {/* Served → Print + Pay */}
+                {order.status === 'served' && (
+                  <>
+                    <button onClick={() => printBillPreview(order)} className="flex-1 py-2 bg-dark-500 rounded-lg text-[11px] font-semibold text-gray-300">
+                      🖨️ In bill tạm
+                    </button>
+                    <button onClick={() => goToPayment(order)} className="flex-1 py-2 bg-green-500 rounded-lg text-[11px] font-semibold text-white">
+                      💰 Thanh toán
+                    </button>
+                  </>
+                )}
+
+                {/* All active orders: add items */}
+                {!['paid', 'cancelled'].includes(order.status) && (
+                  <Link
+                    href={`/staff/add-items?orderId=${order.id}&table=${order.table.name}`}
+                    className="py-2 px-3 bg-orange-500/10 border border-orange-500/30 rounded-lg text-[11px] font-semibold text-orange-400 text-center"
+                  >
+                    + Thêm
+                  </Link>
+                )}
+              </div>
             </div>
           );
         })}
@@ -179,46 +309,3 @@ function NavItem({ icon, label, active, href }: { icon: string; label: string; a
   );
   return href ? <Link href={href}>{content}</Link> : content;
 }
-
-// ===== Mock =====
-const MOCK_ORDERS: Order[] = [
-  {
-    id: 'o1', orderNumber: 32, status: 'cooking', source: 'staff', total: 900000,
-    createdAt: new Date(Date.now() - 2700000).toISOString(),
-    table: { name: 'A01' }, staff: { name: 'Nguyễn Văn Nam' },
-    items: [
-      { menuItem: { name: 'Bò nướng tảng' }, quantity: 2, unitPrice: 250000 },
-      { menuItem: { name: 'Mực nướng muối ớt' }, quantity: 1, unitPrice: 250000 },
-      { menuItem: { name: 'Tiger Bạc' }, quantity: 6, unitPrice: 25000 },
-    ],
-  },
-  {
-    id: 'o2', orderNumber: 28, status: 'served', source: 'qr', total: 1270000,
-    createdAt: new Date(Date.now() - 4800000).toISOString(),
-    table: { name: 'A05' }, staff: undefined,
-    items: [
-      { menuItem: { name: 'Lẩu hải sản chua cay' }, quantity: 1, unitPrice: 450000 },
-      { menuItem: { name: 'Bò nướng tảng' }, quantity: 2, unitPrice: 350000 },
-      { menuItem: { name: 'Heineken' }, quantity: 4, unitPrice: 30000 },
-    ],
-  },
-  {
-    id: 'o3', orderNumber: 25, status: 'pending', source: 'staff', total: 284000,
-    createdAt: new Date(Date.now() - 3300000).toISOString(),
-    table: { name: 'B03' }, staff: { name: 'Lê Văn Tài' },
-    items: [
-      { menuItem: { name: 'Cánh gà chiên mắm' }, quantity: 1, unitPrice: 155000 },
-      { menuItem: { name: 'Tiger Nâu' }, quantity: 2, unitPrice: 22000 },
-      { menuItem: { name: 'Nem chua rán' }, quantity: 1, unitPrice: 85000 },
-    ],
-  },
-  {
-    id: 'o4', orderNumber: 20, status: 'paid', source: 'staff', total: 270000,
-    createdAt: new Date(Date.now() - 7200000).toISOString(),
-    table: { name: 'C01' }, staff: { name: 'Trần Thị Hoa' },
-    items: [
-      { menuItem: { name: 'Rau muống xào tỏi' }, quantity: 2, unitPrice: 45000 },
-      { menuItem: { name: 'Bò lúc lắc' }, quantity: 1, unitPrice: 180000 },
-    ],
-  },
-];
