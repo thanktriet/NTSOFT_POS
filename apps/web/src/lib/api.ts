@@ -22,8 +22,10 @@ export async function api<T = any>(path: string, options: FetchOptions = {}): Pr
     'Content-Type': 'application/json',
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  // Auto-attach token from localStorage if not provided
+  const authToken = token || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+  if (authToken) {
+    headers['Authorization'] = `Bearer ${authToken}`;
   }
 
   const res = await fetch(`${API_BASE}${path}`, {
@@ -33,6 +35,16 @@ export async function api<T = any>(path: string, options: FetchOptions = {}): Pr
   });
 
   if (!res.ok) {
+    // Handle 401 - redirect to login
+    if (res.status === 401 && typeof window !== 'undefined') {
+      // Don't redirect if already on login page
+      if (!window.location.pathname.includes('/login')) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('staff');
+        window.location.href = '/staff/login';
+        throw new Error('Phiên đăng nhập hết hạn');
+      }
+    }
     const error = await res.json().catch(() => ({ message: 'Request failed' }));
     throw new Error(error.message || `HTTP ${res.status}`);
   }
