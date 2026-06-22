@@ -216,9 +216,9 @@ ${qrData ? `<div class="qr-section"><div class="sep"></div><p style="font-size:1
       {/* Bill + QR side by side on larger screens */}
       <div className="px-4 mt-4 space-y-4">
 
-        {/* QR Payment - Always visible on top */}
-        {qrData && (
-          <div className="bg-dark-600 rounded-2xl p-4 border border-dark-400">
+        {/* QR Payment - Only show when QR method selected */}
+        {qrData && method === 'qr_transfer' && (
+          <div className="bg-dark-600 rounded-2xl p-4 border border-dark-400 animate-fadeInUp">
             <div className="flex items-start gap-4">
               <div className="bg-white rounded-xl p-2 flex-shrink-0">
                 <img src={qrData.qrUrl} alt="VietQR" className="w-28 h-28" />
