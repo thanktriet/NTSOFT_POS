@@ -41,12 +41,14 @@ export default function StaffPaymentPage() {
   const [paymentResult, setPaymentResult] = useState<any>(null);
   const [qrData, setQrData] = useState<any>(null);
   const [error, setError] = useState('');
+  const [tableName, setTableName] = useState('');
 
   useEffect(() => {
     const stored = localStorage.getItem('payment_order');
     if (stored) {
       const o = JSON.parse(stored);
       setOrder(o);
+      setTableName(o.table?.name || o.tableName || '');
       loadTableOrders(o.table?.id || o.tableId);
     } else {
       router.push('/staff/orders');
@@ -60,6 +62,10 @@ export default function StaffPaymentPage() {
       setAllOrders(orders);
       const items = orders.flatMap((o: Order) => o.items || []);
       setAllItems(items);
+      // Get table name from first order if available
+      if (orders.length > 0 && orders[0].table?.name) {
+        setTableName(orders[0].table.name);
+      }
     } catch {
       if (order?.items) setAllItems(order.items);
     }
@@ -118,14 +124,14 @@ export default function StaffPaymentPage() {
 
   const printBill = () => {
     if (!order) return;
-    const tableName = order.table?.name || '—';
+    const billTableName = order.table?.name || tableName || '—';
     const now = new Date();
     const timeStr = now.toLocaleString('vi-VN');
     const itemsHtml = allItems.map((item) =>
       `<tr><td style="padding:3px 0">${item.quantity}x ${item.menuItem?.name || '—'}</td><td style="text-align:right;padding:3px 0">${formatVND(item.unitPrice * item.quantity)}</td></tr>`
     ).join('');
 
-    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bill ${tableName}</title>
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bill ${billTableName}</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Courier New',monospace;font-size:12px;width:280px;margin:0 auto;padding:16px}
 .center{text-align:center}.bold{font-weight:bold}.big{font-size:16px}.sep{border-top:1px dashed #000;margin:8px 0}
 table{width:100%;border-collapse:collapse}.right{text-align:right}.total-row{font-size:14px;font-weight:bold}
@@ -137,7 +143,7 @@ table{width:100%;border-collapse:collapse}.right{text-align:right}.total-row{fon
 <div class="center" style="font-size:11px;margin-top:4px">123 Nguyễn Huệ, Q.1, TP.HCM<br>ĐT: 0901234567</div>
 <div class="sep"></div>
 <div class="center bold" style="font-size:14px;margin:8px 0">HÓA ĐƠN THANH TOÁN</div>
-<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span>Bàn: <b>${tableName}</b></span><span>${timeStr}</span></div>
+<div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span>Bàn: <b>${billTableName}</b></span><span>${timeStr}</span></div>
 <div class="sep"></div>
 <table>${itemsHtml}</table>
 <div class="sep"></div>
@@ -172,7 +178,7 @@ ${qrData ? `<div class="qr-section"><div class="sep"></div><p style="font-size:1
         <div className="text-center w-full max-w-[340px]">
           <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 animate-bounceIn">✅</div>
           <h2 className="text-xl font-bold mb-1">Thanh toán thành công!</h2>
-          <p className="text-gray-400 text-sm">Bàn {order.table?.name || '—'} · {formatVND(total)}</p>
+          <p className="text-gray-400 text-sm">Bàn {order.table?.name || tableName || '—'} · {formatVND(total)}</p>
           {method === 'cash' && change > 0 && (
             <div className="mt-3 p-3 bg-green-500/10 border border-green-500/30 rounded-xl">
               <span className="text-green-400 text-sm font-semibold">Tiền thối: {formatVND(change)}</span>
@@ -208,7 +214,7 @@ ${qrData ? `<div class="qr-section"><div class="sep"></div><p style="font-size:1
             🖨️ In bill
           </button>
           <span className="bg-orange-500 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg">
-            {order.table?.name || '—'}
+            {order.table?.name || tableName || '—'}
           </span>
         </div>
       </header>
@@ -240,7 +246,7 @@ ${qrData ? `<div class="qr-section"><div class="sep"></div><p style="font-size:1
         <div className="bg-dark-600 rounded-2xl p-4 border border-dark-400">
           <div className="flex justify-between items-center mb-3 pb-3 border-b border-dashed border-dark-400">
             <h3 className="text-sm font-semibold">🧾 Chi tiết hóa đơn</h3>
-            <span className="text-[11px] text-gray-500">Bàn {order.table?.name || '—'}</span>
+            <span className="text-[11px] text-gray-500">Bàn {order.table?.name || tableName || '—'}</span>
           </div>
 
           {/* Items */}
